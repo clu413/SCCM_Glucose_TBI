@@ -6,6 +6,6 @@ Inclusion:
 - Patients who are no less than 18 years of age
 
 Exclusion: 
-Patients who do not have any glucose reading
-Patients who do not have APACHE score
+- Patients who do not have any glucose reading
+- Patients who do not have APACHE score
 
