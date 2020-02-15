@@ -1,0 +1,21 @@
+SELECT
+  d.patientunitstayid
+, d.LAB_NAME
+, d.DAY
+, d.Glucose_min
+, d.Glucose_max
+, d.Glucose_median
+, d.Glucose_mean 
+, d.Glucose_std 
+, d.Glucose_count
+, w.Glucose_min_week
+, w.Glucose_max_week
+, w.Glucose_median_week
+, w.Glucose_mean_week 
+, w.Glucose_std_week 
+, w.Glucose_count_week
+FROM `sccm-datathon.team_5.glucose_chart` AS d
+INNER JOIN `sccm-datathon.team_5.glucose_week_cohort` AS w
+ON d.patientunitstayid = w.patientunitstayid
+WHERE w.Glucose_count_week >= 2
+ORDER BY d.patientunitstayid, d.DAY
