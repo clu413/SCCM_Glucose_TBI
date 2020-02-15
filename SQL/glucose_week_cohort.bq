@@ -1,0 +1,31 @@
+SELECT *
+FROM(SELECT
+  pv1.patientunitstayid
+, CASE WHEN pv1.labname = 'glucose' OR pv1.labname = 'bedside glucose' THEN 'GLUCOSE' ELSE null END AS LAB_NAME
+, pv1.labresult
+, pv1.labresultoffset
+, 7 AS DAY
+, MAX(pv1.labresult) OVER ( PARTITION BY pv1.patientunitstayid ORDER BY pv1.patientunitstayid ) AS Glucose_max_week
+, MIN(pv1.labresult) OVER ( PARTITION BY pv1.patientunitstayid ORDER BY pv1.patientunitstayid ) AS Glucose_min_week
+, PERCENTILE_CONT(pv1.labresult, 0.5) OVER( PARTITION BY pv1.patientunitstayid ) AS Glucose_median_week
+, AVG(pv1.labresult)  OVER ( PARTITION BY pv1.patientunitstayid ORDER BY pv1.patientunitstayid ) AS Glucose_mean_week
+, STDDEV(pv1.labresult)  OVER ( PARTITION BY pv1.patientunitstayid ORDER BY pv1.patientunitstayid) AS Glucose_std_week
+, COUNT(pv1.patientunitstayid) OVER ( PARTITION BY pv1.patientunitstayid ORDER BY pv1.patientunitstayid) AS Glucose_count_week
+, ROW_NUMBER() OVER
+        (PARTITION BY pv1.patientunitstayid
+          ORDER BY pv1.patientunitstayid, pv1.labresultoffset ASC
+        ) as rn
+FROM(SELECT
+      lab.patientunitstayid
+    , lab.labname
+    , lab.labresultoffset
+    , lab.labresult
+FROM `physionet-data.eicu_crd.lab` AS lab
+WHERE UPPER(lab.labname) IN ('GLUCOSE','BEDSIDE GLUCOSE')
+AND lab.labresult IS NOT null AND lab.labresult > 0 -- lab values cannot be 0 and cannot be negative
+AND(lab.labname in ('bedside glucose', 'glucose') and lab.labresult >= 25 and lab.labresult <= 1500)
+) AS pv1
+WHERE pv1.labresultoffset <= 10080 AND pv1.labresultoffset > (-6*24)
+ORDER BY pv1.patientunitstayid, pv1.labresultoffset) AS pv2
+WHERE pv2.rn = 1
+AND pv2.patientunitstayid IN(SELECT patientunitstayid FROM `sccm-datathon.team_5.Patients_info`)
