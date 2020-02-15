@@ -1,0 +1,47 @@
+WITH SUBQ AS(SELECT 
+  pv2.patientunitstayid
+, pv2.LAB_NAME
+, pv2.labresult
+, pv2.labresultoffset
+, pv2.DAY
+, MAX(pv2.labresult) OVER ( PARTITION BY pv2.patientunitstayid, pv2.DAY ORDER BY pv2.patientunitstayid, pv2.DAY ) AS Glucose_max
+, MIN(pv2.labresult) OVER ( PARTITION BY pv2.patientunitstayid, pv2.DAY ORDER BY pv2.patientunitstayid, pv2.DAY ) AS Glucose_min
+, PERCENTILE_CONT(pv2.labresult, 0.5) OVER( PARTITION BY pv2.patientunitstayid, pv2.DAY ) AS Glucose_median
+, AVG(pv2.labresult)  OVER ( PARTITION BY pv2.patientunitstayid, pv2.DAY ORDER BY pv2.patientunitstayid, pv2.DAY ) AS Glucose_mean
+, STDDEV(pv2.labresult)  OVER ( PARTITION BY pv2.patientunitstayid, pv2.DAY ORDER BY pv2.patientunitstayid, pv2.DAY ) AS Glucose_std
+, COUNT(pv2.patientunitstayid) OVER ( PARTITION BY pv2.patientunitstayid, pv2.DAY ORDER BY pv2.patientunitstayid, pv2.DAY ) AS Glucose_count
+, ROW_NUMBER() OVER
+        (PARTITION BY pv2.patientunitstayid, pv2.DAY
+          ORDER BY pv2.patientunitstayid, pv2.DAY ASC
+        ) as rn
+FROM(SELECT
+  pv1.patientunitstayid
+, CASE WHEN pv1.labname = 'glucose' OR pv1.labname = 'bedside glucose' THEN 'GLUCOSE' ELSE null END AS LAB_NAME
+, pv1.labresult
+, pv1.labresultoffset
+, CASE
+    WHEN pv1.labresultoffset <= 1440 AND pv1.labresultoffset > -6*24 THEN 1
+    WHEN pv1.labresultoffset > 1440 AND pv1.labresultoffset <= 2880 THEN 2
+    WHEN pv1.labresultoffset > 2880 AND pv1.labresultoffset <= 4320 THEN 3
+    WHEN pv1.labresultoffset > 4320 AND pv1.labresultoffset <= 5760 THEN 4
+    WHEN pv1.labresultoffset > 5760 AND pv1.labresultoffset <= 7200 THEN 5
+    WHEN pv1.labresultoffset > 7200 AND pv1.labresultoffset <= 8640 THEN 6
+    WHEN pv1.labresultoffset > 8640 AND pv1.labresultoffset <= 10080 THEN 7
+   ELSE NULL
+   END AS DAY
+FROM(SELECT
+      lab.patientunitstayid
+    , lab.labname
+    , lab.labresultoffset
+    , lab.labresult
+FROM `physionet-data.eicu_crd.lab` AS lab
+WHERE UPPER(lab.labname) IN ('GLUCOSE','BEDSIDE GLUCOSE')
+AND lab.labresult IS NOT null AND lab.labresult > 0 -- lab values cannot be 0 and cannot be negative
+AND(lab.labname in ('bedside glucose', 'glucose') and lab.labresult >= 25 and lab.labresult <= 1500)
+) AS pv1
+WHERE pv1.labresultoffset <= 10080 AND pv1.labresultoffset > (-6*24)
+) AS pv2)
+
+SELECT patientunitstayid,	LAB_NAME, DAY, Glucose_max, Glucose_min, Glucose_median, Glucose_mean, Glucose_std, Glucose_count FROM SUBQ
+WHERE patientunitstayid IN(SELECT patientunitstayid FROM `sccm-datathon.team_5.Patients_info`)
+ORDER BY patientunitstayid, labresultoffset, DAY
