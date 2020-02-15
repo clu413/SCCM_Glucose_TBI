@@ -1,0 +1,6 @@
+SELECT * FROM `sccm-datathon.team_5.Patients_info`
+WHERE patientunitstayid IN(SELECT DISTINCT(patientunitstayid) AS unPat
+                           FROM `sccm-datathon.team_5.glucose_pivot`
+                           WHERE Glucose_count_week >= 2
+                           AND Glucose_count >= 2
+                           GROUP BY patientunitstayid)
